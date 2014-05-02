@@ -1,4 +1,4 @@
-
+﻿
 #pragma once
 
 #include <map>
@@ -7,6 +7,7 @@
 #include <boost/asio.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/function.hpp>
+#include <boost/noncopyable.hpp>
 
 namespace boost {
 namespace detail {
@@ -83,7 +84,7 @@ private:
  */
 
 template<typename ListType>
-class async_coro_queue{
+class async_coro_queue : boost::noncopyable{
 public: // typetraits
 	typedef typename ListType::value_type value_type;
 	typedef typename ListType::size_type size_type;

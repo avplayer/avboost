@@ -1,4 +1,4 @@
-
+﻿
 
 /*
  * Copyright (C) 2013  微蔡 <microcai@fedoraproject.org>
@@ -120,7 +120,7 @@ public:
 
 	reference operator* () const
 	{
-		// 取出 当前字符
+		// 取出 当前字符.
 		if(need_encode())
 			return cur_char_buf[cur_char_pos];
 
@@ -155,13 +155,13 @@ public:
 };
 
 } // namespace iterators
-
-template<class String>
-String url_encode(const String & str)
+/*
+static inline std::string url_encode(std::string str)
 {
-	return String(iterators::url_encode_iterator<typename String::const_iterator>(str.begin()),
-					   iterators::url_encode_iterator<typename String::const_iterator>(str.end()));
+	return std::string(iterators::url_encode_iterator<std::string::const_iterator>(str.begin()),
+		iterators::url_encode_iterator<std::string::const_iterator>(str.end()));
 }
+*/
 
 } // namespace boost
 // kate: indent-mode cstyle; indent-width 4; replace-tabs off; tab-width 4;
