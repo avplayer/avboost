@@ -77,3 +77,31 @@ inline std::string local_encode_to_utf8(const std::string & str)
 	return str;
 #endif
 }
+
+// VC 的　"字符串"　是 本地编码的，如果文件是　UTF8 BOM 的话．
+// 但是　MinGW 的　"字符串"　是　utf8 的
+// linux 下的编译器也全部是　utf8　的
+// 但是windows控制台输出的时候，要求的是本地编码
+// 而 linux 的控制台则要求的是　utf8　编码
+// 于是，就需要把　"字符串"　给确定的转换为本地编码
+// 这个代码就是干这个活用的
+
+
+#if defined(__MSC_VER) || ( !defined(_WIN32) || !defined(_WIN64) )
+#define localstr(x) std::string(x)
+#else
+static inline std::string literal_to_localstr(const char* str)
+{
+#ifdef __MSC_VER
+#error "vc no use "
+#endif
+	return utf8_to_local_encode(str);
+}
+#endif
+
+// 有时候我们却是需要　utf8 的　literal 字符串，但是　VC 却会生成本地编码的，所以你需要这个
+#if defined(__MSC_VER)
+#define literal_to_utf8str(x) u8##x
+#else
+#define literal_to_utf8str(x) std::string(x)
+#endif
