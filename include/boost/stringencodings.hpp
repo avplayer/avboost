@@ -1,6 +1,10 @@
 ﻿
 #pragma once
 
+#ifdef _MSC_VER
+#pragma execution_character_set("utf-8")
+#endif
+
 #include <wchar.h>
 #include <string>
 #include <boost/locale.hpp>
@@ -85,24 +89,24 @@ inline std::string local_encode_to_utf8(const std::string & str)
 // 而 linux 的控制台则要求的是　utf8　编码
 // 于是，就需要把　"字符串"　给确定的转换为本地编码
 // 这个代码就是干这个活用的
-#if defined(_MSC_VER) || ( !defined(_WIN32) || !defined(_WIN64) )
-#define literal_to_localstr(x) std::string(x)
-#else
+//#if defined(_MSC_VER) || ( !defined(_WIN32) || !defined(_WIN64) )
+//#define literal_to_localstr(x) std::string(x)
+//#else
 static inline std::string literal_to_localstr(const char* str)
 {
-#ifdef _MSC_VER
-#error "vc no use "
-#endif
+//#ifdef _MSC_VER
+//#error "vc no use "
+//#endif
 	return utf8_to_local_encode(str);
 }
-#endif
+//#endif
 
 // 有时候我们却是需要　utf8 的　literal 字符串，但是　VC 却会生成本地编码的，所以你需要这个
-#if defined(_MSC_VER)
-static inline std::string literal_to_utf8str(const char* str)
-{
-	return local_encode_to_utf8(str);
-}
-#else
+//#if defined(_MSC_VER)
+//static inline std::string literal_to_utf8str(const char* str)
+//{
+//	return local_encode_to_utf8(str);
+//}
+//#else
 #define literal_to_utf8str(x) std::string(x)
-#endif
+//#endif
