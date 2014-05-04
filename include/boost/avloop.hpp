@@ -70,6 +70,7 @@ static inline void avloop_run(boost::asio::io_service & io_service)
 	}
 }
 
+#ifdef _WIN32
 // MsgWaitForMultipleObjectsEx 集成进去
 static inline void avloop_run_gui(boost::asio::io_service & io_service)
 {
@@ -101,3 +102,4 @@ static inline void avloop_run_gui(boost::asio::io_service & io_service)
 		}
 	}
 }
+#endif
