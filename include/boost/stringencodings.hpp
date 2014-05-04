@@ -13,6 +13,22 @@
 #include <windows.h>
 #endif
 
+inline std::string wide_to_utf8(const std::wstring & wstr)
+{
+#if defined(_WIN32) || defined(_WIN64)
+	int required_buffer_size = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], wstr.size(), NULL, 0, NULL, NULL);
+	std::string outstr;
+	outstr.resize(required_buffer_size);
+
+	int converted_size = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], wstr.size(), &outstr[0], required_buffer_size, NULL, NULL);
+	outstr.resize(converted_size);
+
+	return outstr;
+#else
+	return boost::locale::conv::utf_to_utf<char>(wstr);
+#endif
+}
+
 inline std::string ansi_utf8( std::string const &source, const std::string &characters = "GB18030" )
 {
 	return boost::locale::conv::between( source, "UTF-8", characters ).c_str();
