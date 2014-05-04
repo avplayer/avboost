@@ -69,3 +69,35 @@ static inline void avloop_run(boost::asio::io_service & io_service)
 		}
 	}
 }
+
+// MsgWaitForMultipleObjectsEx 集成进去
+static inline void avloop_run_gui(boost::asio::io_service & io_service)
+{
+	using namespace ::detail;
+	boost::asio::io_service::work work(io_service);
+	if (!boost::asio::has_service<IdleService>(io_service))
+	{
+		boost::asio::add_service(io_service, new IdleService(io_service));
+	}
+
+	while (!io_service.stopped())
+	{
+		if (!boost::asio::use_service<IdleService>(io_service).has_idle()){
+
+			MsgWaitForMultipleObjectsEx(0, 0, 50, QS_ALLEVENTS, MWMO_ALERTABLE | MWMO_INPUTAVAILABLE);
+			MSG msg;
+			if (PeekMessage(&msg, 0, 0, 0, 1))
+			{
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			};
+
+			io_service.run_one();
+		}
+		else{
+			while (io_service.poll()){};
+			// 执行 idle handler!
+			boost::asio::use_service<IdleService>(io_service).poll_one();
+		}
+	}
+}
