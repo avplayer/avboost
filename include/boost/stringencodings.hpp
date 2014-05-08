@@ -116,13 +116,3 @@ static inline std::string literal_to_localstr(const char* str)
 	return utf8_to_local_encode(str);
 }
 //#endif
-
-// 有时候我们却是需要　utf8 的　literal 字符串，但是　VC 却会生成本地编码的，所以你需要这个
-//#if defined(_MSC_VER)
-//static inline std::string literal_to_utf8str(const char* str)
-//{
-//	return local_encode_to_utf8(str);
-//}
-//#else
-#define literal_to_utf8str(x) std::string(x)
-//#endif
