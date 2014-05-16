@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <boost/asio.hpp>
 #include <boost/function/function0.hpp>
@@ -30,7 +30,7 @@ public:
 	void poll_one()
 	{
 		//op_queue;
-		get_io_service().post( op_queue.front() );
+		get_io_service().dispatch( op_queue.front() );
 		op_queue.pop_front();
 	}
 };
@@ -39,8 +39,10 @@ public:
 class Win32MsgLoopService
 	: public boost::asio::detail::service_base<IdleService>
 {
-	virtual void shutdown_service(){
-
+	virtual void shutdown_service()
+	{
+		m_is_stoped = true;
+		PostQuitMessage(0);
 	}
 
 	bool m_is_stoped;
@@ -149,7 +151,7 @@ static inline void avloop_run_gui(boost::asio::io_service & io_service)
 
 		// 都没有事件了，执行 一次 1ms 的超时等待
 
-		auto ret = MsgWaitForMultipleObjectsEx(0, nullptr, 1, QS_ALLEVENTS, MWMO_ALERTABLE | MWMO_INPUTAVAILABLE);
+		auto ret = MsgWaitForMultipleObjectsEx(0, nullptr, 1, QS_ALLEVENTS, MWMO_WAITALL|MWMO_ALERTABLE | MWMO_INPUTAVAILABLE);
 		// 可能是有 gui 消息了， 呵呵， 从头来吧
 	}
 }
