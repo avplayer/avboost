@@ -37,7 +37,7 @@ public:
 
 #ifdef _WIN32
 class Win32MsgLoopService
-	: public boost::asio::detail::service_base<IdleService>
+	: public boost::asio::detail::service_base<Win32MsgLoopService>
 {
 	virtual void shutdown_service()
 	{
@@ -48,9 +48,8 @@ class Win32MsgLoopService
 	bool m_is_stoped;
 
 public:
-
 	Win32MsgLoopService(boost::asio::io_service& owner)
-		: boost::asio::detail::service_base<IdleService>(owner){}
+		: boost::asio::detail::service_base<Win32MsgLoopService>(owner){ m_is_stoped = false; }
 
 	bool has_message() const
 	{
@@ -146,7 +145,7 @@ static inline void avloop_run_gui(boost::asio::io_service & io_service)
 		}
 
 		// 执行 idle handler!
-		if (!boost::asio::use_service<IdleService>(io_service).has_idle())
+		if (boost::asio::use_service<IdleService>(io_service).has_idle())
 			boost::asio::use_service<IdleService>(io_service).poll_one();
 
 		// 都没有事件了，执行 一次 1ms 的超时等待
