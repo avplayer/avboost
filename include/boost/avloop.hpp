@@ -12,7 +12,7 @@ class IdleService
 	virtual void shutdown_service()
 	{}
 
-	std::list<boost::function0<void> >	op_queue;
+	std::list<boost::function0<void> > op_queue;
 
 public:
 
@@ -97,7 +97,7 @@ void avloop_idle_post(boost::asio::io_service& io_service, Handler handler)
 static inline void avloop_run(boost::asio::io_service& io_service)
 {
 	using namespace ::detail;
-	boost::asio::io_service::work work(io_service);
+
 	if (!boost::asio::has_service<IdleService>(io_service))
 		boost::asio::add_service(io_service, new IdleService(io_service));
 
@@ -105,7 +105,8 @@ static inline void avloop_run(boost::asio::io_service& io_service)
 	{
 		if(!boost::asio::use_service<IdleService>(io_service).has_idle())
 		{
-			io_service.run_one();
+			if (!io_service.run_one())
+				break;
 		}
 		else
 		{
