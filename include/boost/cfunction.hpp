@@ -15,22 +15,49 @@ namespace boost {
  *
  * 例子在是这样的, 相信这个例子一看大家全明白了, 呵呵
  *
-
-static void * my_thread_func(int a, int b,  int c)
+static void * my_thread_func2(int a, int b, int c, cfunction<void *(*) (void *),  void*()> func2)
 {
+	// 故意睡一下，保证 那个线程的 func2 对象析构，这个拷贝的 func2 也能维持好 C 函数的数据，避免下面的代码崩溃！
+	sleep(10);
+	std::cout << "这样就不用管理 func2 啦！自动释放不是？" << std::endl;
 	std::cout <<  a <<  b <<  c <<  std::endl;
 	return NULL;
 }
 
+static void * my_thread_func(int a, int b,  int c)
+{
+	cfunction<void *(*) (void *),  void*()> func2;
+
+	// 通过将自己绑定进去，func2 这个对象就不必保持生命期， 回调执行完毕会自动清空数据！
+	func2 = boost::bind(&my_thread_func2, 3, 2, 3, func2);
+
+	pthread_t new_thread;
+
+	pthread_create(&new_thread, NULL, func2.c_func_ptr(), func2.c_void_ptr());
+
+	// 让线程进入不可 join 状态，无需等待线程退出
+	pthread_detach(new_thread);
+
+	std::cout <<  a <<  b <<  c <<  std::endl;
+	return NULL;
+	// 这里 func2 对象析构了，但是估计那个线程函数还没有执行完毕，如果不 bind 进去，到这里析构后，那个线程就会崩溃。
+	// 但是，因为将 func2 对象绑定进去了，所以那个线程可以继续安然无恙的运行。
+}
+
 int main(int, char*[])
 {
-	cfunction<void *(*) (void *),  void*()> func = boost::bind(&my_thread_func, 1, 2, 3);
+	cfunction<void *(*) (void *),  void*()> func;
+
+	func = boost::bind(&my_thread_func, 1, 2, 3);
 
 	pthread_t new_thread;
 
 	pthread_create(&new_thread, NULL, func.c_func_ptr(), func.c_void_ptr());
-
+	// 等待 线程退出，这样这个 func 对象要保证回调期间的生命期
 	pthread_join(new_thread, NULL);
+
+	// 等待另一个unjoinable 的线程退出
+	sleep(100);
     return 0;
 }
 
@@ -42,38 +69,29 @@ class cfunction
 public:
 	typedef typename boost::function_traits<ClosureSignature>::result_type return_type;
 	typedef boost::function<ClosureSignature> closure_type;
+private:
+	boost::shared_ptr<closure_type> m_wrapped_func;
+public:
+	cfunction()
+		: m_wrapped_func(make_shared<closure_type>())
+	{
+	}
 
 	cfunction(const closure_type &bindedfuntor)
+		: m_wrapped_func(make_shared<closure_type>())
 	{
-		m_wrapped_func.reset(new closure_type(bindedfuntor));
-	}
-
-	cfunction(const cfunction<CFuncType, ClosureSignature> & other)
-	{
-		m_wrapped_func.reset(new closure_type(* other.m_wrapped_func));
-	}
-
-	template<typename T>
-	cfunction(T other)
-	{
-		m_wrapped_func.reset(new closure_type(other));
+		*m_wrapped_func = bindedfuntor;
 	}
 
 	cfunction& operator = (const closure_type& bindedfuntor)
 	{
-		m_wrapped_func.reset(new closure_type(bindedfuntor));
-		return *this;
-	}
-
-	cfunction& operator = (const cfunction& other)
-	{
-		m_wrapped_func.reset(new closure_type(* other.m_wrapped_func));
+		*m_wrapped_func = closure_type(bindedfuntor);
 		return *this;
 	}
 
 	void * c_void_ptr()
 	{
-		return new closure_type(*m_wrapped_func);
+		return m_wrapped_func.get();
 	}
 
 	CFuncType c_func_ptr()
@@ -84,8 +102,7 @@ public:
 private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑一个出来并实例化.
 	static return_type wrapperd_callback(void* user_data)
 	{
-		boost::scoped_ptr<closure_type> wrapped_func(
-					reinterpret_cast<closure_type *>(user_data));
+		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
 		return (*wrapped_func)();
 	}
@@ -93,8 +110,7 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 	template<typename ARG1>
 	static return_type wrapperd_callback(ARG1 arg1, void* user_data)
 	{
-		boost::scoped_ptr<closure_type> wrapped_func(
-					reinterpret_cast<closure_type*>(user_data));
+		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
 		return (*wrapped_func)(arg1);
 	}
@@ -102,8 +118,7 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 	template<typename ARG1, typename ARG2>
 	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, void* user_data)
 	{
-		boost::scoped_ptr<closure_type> wrapped_func(
-					reinterpret_cast<closure_type*>(user_data));
+		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
 		return (*wrapped_func)(arg1, arg2);
 	}
@@ -111,8 +126,7 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 	template<typename ARG1, typename ARG2, typename ARG3>
 	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, void* user_data)
 	{
-		boost::scoped_ptr<closure_type> wrapped_func(
-					reinterpret_cast<closure_type*>(user_data));
+		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
 		return (*wrapped_func)(arg1, arg2, arg3);
 	}
@@ -120,8 +134,7 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4>
 	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, void* user_data)
 	{
-		boost::scoped_ptr<closure_type> wrapped_func(
-					reinterpret_cast<closure_type*>(user_data));
+		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
 		return (*wrapped_func)(arg1, arg2, arg3, arg4);
 	}
@@ -129,8 +142,7 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4, typename ARG5>
 	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, ARG5 arg5, void* user_data)
 	{
-		boost::scoped_ptr<closure_type> wrapped_func(
-					reinterpret_cast<closure_type*>(user_data));
+		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
 		return (*wrapped_func)(arg1, arg2, arg3, arg4, arg5);
 	}
@@ -138,8 +150,7 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4, typename ARG5, typename ARG6>
 	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, ARG5 arg5, ARG6 arg6, void* user_data)
 	{
-		boost::scoped_ptr<closure_type> wrapped_func(
-					reinterpret_cast<closure_type*>(user_data));
+		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
 		return (*wrapped_func)(arg1, arg2, arg3, arg4, arg5, arg6);
 	}
@@ -147,8 +158,7 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4, typename ARG5, typename ARG6, typename ARG7>
 	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, ARG5 arg5, ARG6 arg6, ARG7 arg7, void* user_data)
 	{
-		boost::scoped_ptr<closure_type> wrapped_func(
-					reinterpret_cast<closure_type*>(user_data));
+		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
 		return (*wrapped_func)(arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 	}
@@ -156,8 +166,7 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4, typename ARG5, typename ARG6, typename ARG7, typename ARG8>
 	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, ARG5 arg5, ARG6 arg6, ARG7 arg7, ARG8 arg8, void* user_data)
 	{
-		boost::scoped_ptr<closure_type> wrapped_func(
-					reinterpret_cast<closure_type*>(user_data));
+		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
 		return (*wrapped_func)(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 	}
@@ -165,14 +174,10 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4, typename ARG5, typename ARG6, typename ARG7, typename ARG8, typename ARG9>
 	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, ARG5 arg5, ARG6 arg6, ARG7 arg7, ARG8 arg8, ARG9 arg9, void* user_data)
 	{
-		boost::scoped_ptr<closure_type> wrapped_func(
-					reinterpret_cast<closure_type*>(user_data));
+		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
 		return (*wrapped_func)(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
 	}
-
-private:
-	boost::scoped_ptr<closure_type> m_wrapped_func;
 };
 
 } // namespace boost
