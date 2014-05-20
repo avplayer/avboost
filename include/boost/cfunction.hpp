@@ -119,10 +119,10 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 	static return_type wrapperd_callback(\
 			BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), ARG, nil), void* user_data) \
 	{\
-		closoure_type * wrapped_func = reinterpret_cast<closoure_type*>(user_data); \
+		closure_type * wrapped_func = reinterpret_cast<closure_type*>(user_data); \
 		return (*wrapped_func)(BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), TEXT, arg) ); \
 	}
 
 BOOST_PP_REPEAT_FROM_TO(0, 9, TTP, nil)
-
+};
 } // namespace boost
