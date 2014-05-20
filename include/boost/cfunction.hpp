@@ -4,6 +4,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/type_traits/function_traits.hpp>
+#include <boost/preprocessor.hpp>
 
 namespace boost {
 
@@ -107,77 +108,21 @@ private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑�
 		return (*wrapped_func)();
 	}
 
-	template<typename ARG1>
-	static return_type wrapperd_callback(ARG1 arg1, void* user_data)
-	{
-		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
+#define ARG(z, n, _) Arg ## n arg ## n
 
-		return (*wrapped_func)(arg1);
+#define TEXT(z, n, text) text ## n
+
+#define TTP(z, n, _) \
+	template< \
+		BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), TEXT, typename Arg) \
+	> \
+	static return_type wrapperd_callback(\
+			BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), ARG, nil), void* user_data) \
+	{\
+		closoure_type * wrapped_func = reinterpret_cast<closoure_type*>(user_data); \
+		return (*wrapped_func)(BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), TEXT, arg) ); \
 	}
 
-	template<typename ARG1, typename ARG2>
-	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, void* user_data)
-	{
-		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
-
-		return (*wrapped_func)(arg1, arg2);
-	}
-
-	template<typename ARG1, typename ARG2, typename ARG3>
-	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, void* user_data)
-	{
-		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
-
-		return (*wrapped_func)(arg1, arg2, arg3);
-	}
-
-	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4>
-	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, void* user_data)
-	{
-		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
-
-		return (*wrapped_func)(arg1, arg2, arg3, arg4);
-	}
-
-	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4, typename ARG5>
-	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, ARG5 arg5, void* user_data)
-	{
-		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
-
-		return (*wrapped_func)(arg1, arg2, arg3, arg4, arg5);
-	}
-
-	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4, typename ARG5, typename ARG6>
-	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, ARG5 arg5, ARG6 arg6, void* user_data)
-	{
-		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
-
-		return (*wrapped_func)(arg1, arg2, arg3, arg4, arg5, arg6);
-	}
-
-	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4, typename ARG5, typename ARG6, typename ARG7>
-	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, ARG5 arg5, ARG6 arg6, ARG7 arg7, void* user_data)
-	{
-		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
-
-		return (*wrapped_func)(arg1, arg2, arg3, arg4, arg5, arg6, arg7);
-	}
-
-	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4, typename ARG5, typename ARG6, typename ARG7, typename ARG8>
-	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, ARG5 arg5, ARG6 arg6, ARG7 arg7, ARG8 arg8, void* user_data)
-	{
-		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
-
-		return (*wrapped_func)(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-	}
-
-	template<typename ARG1, typename ARG2, typename ARG3, typename ARG4, typename ARG5, typename ARG6, typename ARG7, typename ARG8, typename ARG9>
-	static return_type wrapperd_callback(ARG1 arg1, ARG2 arg2, ARG3 arg3, ARG4 arg4, ARG5 arg5, ARG6 arg6, ARG7 arg7, ARG8 arg8, ARG9 arg9, void* user_data)
-	{
-		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
-
-		return (*wrapped_func)(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
-	}
-};
+BOOST_PP_REPEAT_FROM_TO(0, 9, TTP, nil)
 
 } // namespace boost
