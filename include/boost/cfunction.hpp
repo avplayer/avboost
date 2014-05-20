@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <boost/make_shared.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/type_traits/function_traits.hpp>
