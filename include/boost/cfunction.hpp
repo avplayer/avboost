@@ -71,59 +71,61 @@ class cfunction
 public:
 	typedef typename boost::function_traits<ClosureSignature>::result_type return_type;
 	typedef boost::function<ClosureSignature> closure_type;
-private:
-	boost::shared_ptr<closure_type> m_wrapped_func;
-public:
-	cfunction()
-		: m_wrapped_func(make_shared<closure_type>())
-	{
-	}
+	private:
+		boost::shared_ptr<closure_type> m_wrapped_func;
+	public:
+		cfunction()
+			: m_wrapped_func(make_shared<closure_type>())
+		{
+		}
 
-	cfunction(const closure_type &bindedfuntor)
-		: m_wrapped_func(make_shared<closure_type>())
-	{
-		*m_wrapped_func = bindedfuntor;
-	}
+		cfunction(const closure_type &bindedfuntor)
+			: m_wrapped_func(make_shared<closure_type>())
+		{
+			*m_wrapped_func = bindedfuntor;
+		}
 
-	cfunction& operator = (const closure_type& bindedfuntor)
-	{
-		*m_wrapped_func = closure_type(bindedfuntor);
-		return *this;
-	}
+		cfunction& operator = (const closure_type& bindedfuntor)
+		{
+			*m_wrapped_func = closure_type(bindedfuntor);
+			return *this;
+		}
 
-	void * c_void_ptr()
-	{
-		return m_wrapped_func.get();
-	}
+		void * c_void_ptr()
+		{
+			return m_wrapped_func.get();
+		}
 
-	CFuncType c_func_ptr()
-	{
-		return (CFuncType)wrapperd_callback;
-	}
+		CFuncType c_func_ptr()
+		{
+			return (CFuncType)wrapperd_callback;
+		}
 
-private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑一个出来并实例化.
-	static return_type wrapperd_callback(void* user_data)
-	{
-		closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
+	private: // 这里是一套重载, 被 c_func_ptr() 依据 C 接口的类型挑一个出来并实例化.
+		static return_type wrapperd_callback(void* user_data)
+		{
+			closure_type *  wrapped_func = reinterpret_cast<closure_type*>(user_data);
 
-		return (*wrapped_func)();
-	}
+			return (*wrapped_func)();
+		}
 
 #define ARG(z, n, _) Arg ## n arg ## n
 
 #define TEXT(z, n, text) text ## n
 
 #define TTP(z, n, _) \
-	template< \
-		BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), TEXT, typename Arg) \
-	> \
-	static return_type wrapperd_callback(\
-			BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), ARG, nil), void* user_data) \
-	{\
-		closure_type * wrapped_func = reinterpret_cast<closure_type*>(user_data); \
-		return (*wrapped_func)(BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), TEXT, arg) ); \
-	}
+		template< \
+			BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), TEXT, typename Arg) \
+		> \
+		static return_type wrapperd_callback(\
+				BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), ARG, nil), void* user_data) \
+		{\
+			closure_type * wrapped_func = reinterpret_cast<closure_type*>(user_data); \
+			return (*wrapped_func)(BOOST_PP_ENUM_ ## z(BOOST_PP_INC(n), TEXT, arg) ); \
+		}
 
-BOOST_PP_REPEAT_FROM_TO(0, 9, TTP, nil)
+		BOOST_PP_REPEAT_FROM_TO(0, 9, TTP, nil)
 };
+
+
 } // namespace boost
