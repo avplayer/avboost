@@ -34,7 +34,7 @@ public:
 
 		if (ec == asio::error::operation_aborted)
 		{
-			// 计时器被取消，啥也不错， 因为回调已经执行了.
+			// 计时器被取消，啥也不做， 因为回调已经执行了.
 			return;
 		}
 
@@ -225,7 +225,8 @@ public:
 					)
 				);
 				m_handlers.pop();
-			}else
+			}
+			else
 			{
 				m_handlers.pop();
 				return push(value);
