@@ -1,4 +1,4 @@
-
+﻿
 #pragma once
 
 #ifdef __llvm__
@@ -6,7 +6,14 @@
 #endif
 
 #include <boost/bind.hpp>
-#include <boost/asio.hpp>
+#include <boost/asio/connect.hpp>
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/detail/handler_alloc_helpers.hpp>
+#include <boost/asio/detail/handler_cont_helpers.hpp>
+#include <boost/asio/detail/handler_invoke_helpers.hpp>
+#include <boost/asio/detail/handler_type_requirements.hpp>
+#include <boost/asio/async_result.hpp>
 
 #include "detail/proxy_chain.hpp"
 
@@ -19,39 +26,29 @@ namespace avproxy {
 //    void handle_connect(
 //         const boost::system::error_code & ec
 //    )
-class async_connect : boost::asio::coroutine
+class async_connect
 {
 public:
 	typedef void result_type; // for boost::bind
 public:
-	template<class Socket, class Handler, class connect_condition>
-	async_connect(Socket & socket,const typename Socket::protocol_type::resolver::query & _query, BOOST_ASIO_MOVE_ARG(Handler) handler, connect_condition _connect_condition)
-	{
-		//BOOST_ASIO_CONNECT_HANDLER_CHECK(Handler, handler) type_check;
-		_async_connect(socket, _query, boost::function<void (const boost::system::error_code&)>(handler), _connect_condition);
-	}
-
 	template<class Socket, class Handler>
 	async_connect(Socket & socket,const typename Socket::protocol_type::resolver::query & _query, BOOST_ASIO_MOVE_ARG(Handler) handler)
 	{
 		//BOOST_ASIO_CONNECT_HANDLER_CHECK(Handler, handler) type_check;
-		_async_connect(socket, _query, boost::function<void (const boost::system::error_code&)>(handler), detail::avproxy_default_connect_condition());
+		_async_connect(socket, _query, boost::function<void (const boost::system::error_code&)>(handler));
 	}
 
-	template<class Handler, class Socket, class connect_condition>
-	void operator()(const boost::system::error_code & ec, typename Socket::protocol_type::resolver::iterator begin, Socket & socket, boost::shared_ptr<typename Socket::protocol_type::resolver> resolver, Handler handler, connect_condition _connect_condition)
+	template<class Handler, class Socket>
+	void operator()(const boost::system::error_code & ec, typename Socket::protocol_type::resolver::results_type resolve_result, Socket & socket, boost::shared_ptr<typename Socket::protocol_type::resolver> resolver, Handler handler)
 	{
- 		//BOOST_ASIO_CONNECT_HANDLER_CHECK(Handler, handler) type_check;
-
-		BOOST_ASIO_CORO_REENTER(this)
-		{
-			BOOST_ASIO_CORO_YIELD boost::asio::async_connect(socket,begin, _connect_condition, boost::bind(*this, _1, _2, boost::ref(socket), resolver, handler, _connect_condition));
-			socket.get_io_service().post(boost::asio::detail::bind_handler(handler,ec));
-		}
+		boost::asio::async_connect(socket, resolve_result, [handler, resolver](auto ec, auto endpoint){
+			handler(ec);
+		});
 	}
+
 private:
-	template<class Socket, class Handler, class connect_condition>
-	void _async_connect(Socket & socket,const typename Socket::protocol_type::resolver::query & _query, BOOST_ASIO_MOVE_ARG(Handler) handler, connect_condition _connect_condition)
+	template<class Socket, class Handler>
+	void _async_connect(Socket & socket,const typename Socket::protocol_type::resolver::query & _query, BOOST_ASIO_MOVE_ARG(Handler) handler)
 	{
 		//BOOST_ASIO_CONNECT_HANDLER_CHECK(Handler, handler) type_check;
 
@@ -59,37 +56,58 @@ private:
 
 		boost::shared_ptr<resolver_type>
 			resolver(new resolver_type(socket.get_io_service()));
-		resolver->async_resolve(_query, boost::bind(*this, _1, _2, boost::ref(socket), resolver, handler, _connect_condition));
+		resolver->async_resolve(_query, boost::bind(*this, _1, _2, boost::ref(socket), resolver, handler));
 	}
 };
 
 // 带　proxy 执行连接.
-class async_proxy_connect : boost::asio::coroutine{
+template<typename Handler>
+class async_proxy_connect_op : boost::asio::coroutine
+{
 public:
 	typedef void result_type; // for boost::bind_handler
 public:
-	template<class Handler>
-	async_proxy_connect(const proxy_chain &proxy_chain, BOOST_ASIO_MOVE_ARG(Handler) handler)
-		:proxy_chain_(proxy_chain)
+	async_proxy_connect_op(const proxy_chain &proxy_chain, Handler &handler)
+		: proxy_chain_(proxy_chain)
+		, m_handler(handler)
 	{
-		boost::function<void (const boost::system::error_code&)> _handler(handler);
-		proxy_chain_.get_io_service().post(boost::bind(*this,boost::system::error_code(), _handler));
 	}
 
-	template <class Handler>
-	void operator()(const boost::system::error_code & ec, Handler  handler)//, typename Socket::protocol_type::resolver::iterator begin, Socket & socket, boost::shared_ptr<typename Socket::protocol_type::resolver> resolver)
+	void operator()(boost::system::error_code ec)
 	{
 		BOOST_ASIO_CORO_REENTER(this)
 		{
-			// resolve
-			BOOST_ASIO_CORO_YIELD proxy_chain_.back()->resolve(boost::bind(*this,_1, handler), proxy_chain_.clone_poped());
-			if(! ec)
-				BOOST_ASIO_CORO_YIELD proxy_chain_.back()->handshake(boost::bind(*this,_1, handler), proxy_chain_.clone_poped());
-			proxy_chain_.get_io_service().post(boost::asio::detail::bind_handler(handler,ec));
+			do
+			{
+				// resolve
+				BOOST_ASIO_CORO_YIELD proxy_chain_.begin()->async_connect(*this);
+				proxy_chain_.pop_front();
+			}while(proxy_chain_.size() && !ec);
+			m_handler(ec);
 		}
 	}
 private:
 	proxy_chain proxy_chain_;
+	Handler m_handler;
 };
+
+template <typename RealHandler>
+inline BOOST_ASIO_INITFN_RESULT_TYPE(RealHandler,
+	void(boost::system::error_code))
+	async_proxy_connect(const proxy_chain &proxy_chain, BOOST_ASIO_MOVE_ARG(RealHandler) handler)
+{
+	using namespace boost::asio;
+
+	BOOST_ASIO_CONNECT_HANDLER_CHECK(RealHandler, handler) type_check;
+
+	boost::asio::async_completion<RealHandler, void(boost::system::error_code)>
+		init(BOOST_ASIO_MOVE_CAST(RealHandler)(handler));
+
+	async_proxy_connect_op<BOOST_ASIO_HANDLER_TYPE(
+		RealHandler, void(boost::system::error_code))>(proxy_chain, init.completion_handler)
+		(boost::system::error_code());
+	return init.result.get();
+
+}
 
 }

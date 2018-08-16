@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "detail/proxy_chain.hpp"
 #include "detail/proxy_tcp.hpp"
